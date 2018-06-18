@@ -85,13 +85,16 @@ ConnectionManager::setupSocketConnection()
         return SocketConnectionUnavailable;
     }
 
+    const QString hardcodedRuntimeDir = QStringLiteral("/run/user/100000");
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
     QString runtimeDir =
         QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
 #else
     QString runtimeDir = environment.value(QLatin1String("XDG_RUNTIME_DIR"));
 #endif
-    if (runtimeDir.isEmpty()) return SocketConnectionUnavailable;
+    if (runtimeDir.isEmpty()) {
+        runtimeDir = hardcodedRuntimeDir; // fallback to hardcoded dir.
+    }
 
     QString socketFileName =
         QString::fromLatin1("unix:path=%1/" SIGNOND_SOCKET_FILENAME).arg(runtimeDir);
@@ -100,6 +103,14 @@ ConnectionManager::setupSocketConnection()
     QDBusConnection connection =
         QDBusConnection::connectToPeer(socketFileName,
                                        QString(QLatin1String("libsignon-qt%1")).arg(count++));
+    if (!connection.isConnected() && runtimeDir != hardcodedRuntimeDir) {
+        // try to connect with hardcoded dir
+        socketFileName =  QString::fromLatin1("unix:path=%1/" SIGNOND_SOCKET_FILENAME)
+                                         .arg(hardcodedRuntimeDir);
+        connection =
+            QDBusConnection::connectToPeer(socketFileName,
+                                           QString(QLatin1String("libsignon-qt%1")).arg(count++));
+    }
     if (!connection.isConnected()) {
         QDBusError error = connection.lastError();
         QString name = error.name();
@@ -143,6 +154,7 @@ void ConnectionManager::init()
                          this,
                          SLOT(onActivationDone(QDBusPendingCallWatcher*)));
     } else if (status == SocketConnectionUnavailable) {
+        TRACE() << "Unable to activate p2p signond service, falling back to session bus";
         m_connection = SIGNOND_BUS;
     }
 
