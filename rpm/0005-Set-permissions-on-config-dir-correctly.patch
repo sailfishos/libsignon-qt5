@@ -1,0 +1,87 @@
+From 4f6473422eb6790854c8c4e4bc7e9c8ef24ce05b Mon Sep 17 00:00:00 2001
+From: Chris Adams <chris.adams@jollamobile.com>
+Date: Thu, 20 Mar 2014 21:44:25 +1000
+Subject: [PATCH 5/7] Set permissions on config dir correctly
+
+Also ensure that signond is launched with privileged permissions
+---
+ oneshot/signon-storage-perm                         | 13 +++++++++++++
+ ....google.code.AccountsSSO.SingleSignOn.service.in |  2 +-
+ server/com.nokia.SingleSignOn.Backup.service.in     |  3 ++-
+ src/signond/main.cpp                                |  2 +-
+ src/signond/signond.pro                             |  7 +++++++
+ 5 files changed, 24 insertions(+), 3 deletions(-)
+ create mode 100644 oneshot/signon-storage-perm
+
+diff --git a/oneshot/signon-storage-perm b/oneshot/signon-storage-perm
+new file mode 100644
+index 0000000..ee059b1
+--- /dev/null
++++ b/oneshot/signon-storage-perm
+@@ -0,0 +1,13 @@
++#!/bin/sh
++
++DEF_UID=$(grep "^UID_MIN" /etc/login.defs |  tr -s " " | cut -d " " -f2)
++DEVICEUSER=$(getent passwd $DEF_UID | sed 's/:.*//')
++if [ ! -d "/home/$DEVICEUSER/.config" ]; then
++    exit 1
++fi
++storage_dir="/home/$DEVICEUSER/.config/signond"
++mkdir -p $storage_dir
++chown privileged $storage_dir
++chgrp privileged $storage_dir
++chmod 770 $storage_dir
++
+diff --git a/server/com.google.code.AccountsSSO.SingleSignOn.service.in b/server/com.google.code.AccountsSSO.SingleSignOn.service.in
+index 4a4599b..87136ad 100644
+--- a/server/com.google.code.AccountsSSO.SingleSignOn.service.in
++++ b/server/com.google.code.AccountsSSO.SingleSignOn.service.in
+@@ -1,3 +1,3 @@
+ [D-BUS Service]
+ Name=com.google.code.AccountsSSO.SingleSignOn
+-Exec=$$INSTALL_PREFIX/bin/signond
++Exec=/usr/bin/invoker --type=qt5 -d 10 -n $$INSTALL_PREFIX/bin/signond
+diff --git a/server/com.nokia.SingleSignOn.Backup.service.in b/server/com.nokia.SingleSignOn.Backup.service.in
+index 6603fd7..bad6f7b 100644
+--- a/server/com.nokia.SingleSignOn.Backup.service.in
++++ b/server/com.nokia.SingleSignOn.Backup.service.in
+@@ -1,3 +1,4 @@
+ [D-BUS Service]
+ Name=com.nokia.SingleSignOn.Backup
+-Exec=$$INSTALL_PREFIX/bin/signond -backup
++Exec=/usr/bin/invoker --type=qt5 -d 10 -n $$INSTALL_PREFIX/bin/signond -backup
++
+diff --git a/src/signond/main.cpp b/src/signond/main.cpp
+index 84751ad..893418d 100644
+--- a/src/signond/main.cpp
++++ b/src/signond/main.cpp
+@@ -38,7 +38,7 @@ void installSigHandlers()
+     sigaction(SIGINT, &act, 0);
+ }
+ 
+-int main(int argc, char *argv[])
++Q_DECL_EXPORT int main(int argc, char *argv[])
+ {
+     QCoreApplication app(argc, argv);
+     installSigHandlers();
+diff --git a/src/signond/signond.pro b/src/signond/signond.pro
+index 76de1ea..f8990d8 100644
+--- a/src/signond/signond.pro
++++ b/src/signond/signond.pro
+@@ -8,6 +8,13 @@ QT += core \
+     network \
+     dbus
+ 
++packagesExist(qt5-boostable) {
++    DEFINES += HAS_BOOSTER
++    PKGCONFIG += qt5-boostable
++} else {
++    warning("qt5-boostable not available; startup times will be slower")
++}
++
+ #generate adaptor for backup
+ system(qdbusxml2cpp -c BackupIfAdaptor -a backupifadaptor.h:backupifadaptor.cpp \
+     ../../lib/signond/com.nokia.SingleSignOn.Backup.xml)
+-- 
+2.20.1
+

@@ -6,6 +6,15 @@ Group: System/Libraries
 License: LGPLv2.1
 URL: https://gitlab.com/accounts-sso/signond
 Source0: %{name}-%{version}.tar.bz2
+
+Patch1: 0001-disable-multilib.patch
+Patch2: 0002-fix-documentation-path.patch
+Patch3: 0003-Install-tests-add-tests-definition.patch
+Patch4: 0004-Continue-reading-from-plugins-after-handling-respons.patch
+Patch5: 0005-Set-permissions-on-config-dir-correctly.patch
+Patch6: 0006-Initialize-private-member-ptr-in-ctor-to-avoid-crash.patch
+Patch7: 0007-Guard-PendingCall-against-deletion-by-connected-slot.patch
+
 BuildRequires: doxygen
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
@@ -167,7 +176,14 @@ This package contains tests for signon
 
 
 %prep
-%setup -q -n %{name}-%{version}/libsignon
+%setup -q -n %{name}-%{version}/upstream
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
 
 chmod +x tests/create-tests-definition.sh
 
